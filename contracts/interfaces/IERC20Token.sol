@@ -3,7 +3,7 @@ pragma solidity ^0.6.12;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-interface IErc20Token is IERC20 {
+interface IERC20Token is IERC20 {
 
     function maxSupply() external view returns (uint256);
 

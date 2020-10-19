@@ -11,10 +11,10 @@ import "./AwardInfo.sol";
 contract AwardContract is DevAward, AwardInfo, Ownable {
 
     using SafeMath for uint256;
-    using SafeERC20 for IErc20Token;
+    using SafeERC20 for IERC20Token;
 
     // platform token
-    IErc20Token public platformToken;
+    IERC20Token public platformToken;
     mapping(address => bool) public governors;
     modifier onlyGovernor{
         require(governors[_msgSender()], "RewardContract: RewardContract:: caller is not the governor");
@@ -26,7 +26,7 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
     event Withdraw(address user, uint256 amount, uint256 tax);
 
     constructor(
-        IErc20Token _platformToken,
+        IERC20Token _platformToken,
         uint256 _taxEpoch,
         address _treasury,
         address _dev,
