@@ -89,7 +89,6 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
         return amount;
     }
 
-    //FIXME
     // get available awards
     function getUserAvailAwards(address user) view public returns (uint256){
         uint256 current = getCurrEpoch();
@@ -125,12 +124,6 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
     function removeGovernor(address governor) onlyOwner external {
         governors[governor] = false;
     }
-
-    //    // set dev start time
-    //    function setDevMineBlock(uint256 blockNum) onlyGovernor external {
-    //        require(devStartBlock == 0, "RewardContract: dev start block number already initialized");
-    //        devStartBlock = blockNum;
-    //    }
 
     // dev get rewards
     function claimDevAwards() external {
@@ -170,7 +163,7 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
             user.notEmpty = true;
         }
         else {
-            // taxLIst not full
+            // taxList not full
             if (user.notEmpty) {
                 uint256 end;
                 if (user.taxTail == 0) {
