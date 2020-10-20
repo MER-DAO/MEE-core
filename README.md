@@ -1,2 +1,2 @@
-# ETF-core
-Core Contracts for ETF
+# MEE-core
+Core Contracts for MEE
