@@ -52,18 +52,16 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
         devStartBlock = _devStartBlock;
     }
 
-
-
     // get user total rewards
     function getUserTotalAwards(address user) view public returns (uint256){
         UserInfo memory info = userInfo[user];
         uint256 amount = info.freeAmount;
         if (info.notEmpty) {
             uint256 cursor = info.taxHead;
-            while(true){
+            while (true) {
                 amount = amount.add(info.taxList[cursor].amount);
                 cursor = cursor.add(1).mod(taxEpoch);
-                if(cursor == info.taxTail){
+                if (cursor == info.taxTail) {
                     break;
                 }
             }
@@ -78,10 +76,10 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
         uint256 amount = info.freeAmount;
         if (info.notEmpty) {
             uint256 cursor = info.taxHead;
-            while(info.taxList[cursor].epoch <= rebaseEp){
+            while (info.taxList[cursor].epoch <= rebaseEp) {
                 amount = amount.add(info.taxList[cursor].amount);
                 cursor = cursor.add(1).mod(taxEpoch);
-                if(cursor == info.taxTail){
+                if (cursor == info.taxTail) {
                     break;
                 }
             }
@@ -98,7 +96,7 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
         if (info.notEmpty) {
             uint256 _ep = taxEpoch.add(1);
             uint256 cursor = info.taxHead;
-            while(true){
+            while (true) {
                 if (info.taxList[cursor].epoch > rebaseEp) {
                     uint rate = current.sub(info.taxList[cursor].epoch).add(1).mul(1e12).div(_ep);
                     uint256 available = info.taxList[cursor].amount.mul(rate).div(1e12);
@@ -107,7 +105,7 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
                     amount = amount.add(info.taxList[cursor].amount);
                 }
                 cursor = cursor.add(1).mod(taxEpoch);
-                if(cursor == info.taxTail){
+                if (cursor == info.taxTail) {
                     break;
                 }
             }
@@ -125,6 +123,46 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
         governors[governor] = false;
     }
 
+    function estimateTax(uint256 _amount) view external returns (uint256){
+        uint256 _current = getCurrEpoch();
+        uint256 tax = 0;
+        UserInfo memory user = userInfo[msg.sender];
+        if (user.freeAmount >= _amount) {
+            return 0;
+        }
+        else {
+            uint256 current = _current;
+            uint256 arrears = _amount.sub(user.freeAmount);
+            uint256 _head = user.taxHead;
+            uint256 _ep = taxEpoch.add(1);
+            while (user.notEmpty) {
+                // non-levied tax rate
+                TaxInfo memory taxInfo = user.taxList[_head];
+                uint rate = current.sub(taxInfo.epoch).add(1).mul(1e12).div(_ep);
+                if(rate > 1e12){
+                    rate = 1e12;
+                }
+                uint256 available = taxInfo.amount.mul(rate).div(1e12);
+                if (available >= arrears) {
+                    uint256 newAmount = arrears.mul(1e12).div(rate);
+                    tax = tax.add(newAmount.sub(arrears));
+                    arrears = 0;
+                    break;
+                }
+                else {
+                    arrears = arrears.sub(available);
+                    tax = tax.add(taxInfo.amount.sub(available));
+                    _head = _head.add(1).mod(taxEpoch);
+                    if (_head == user.taxTail) {
+                        break;
+                    }
+                }
+            }
+            require(arrears == 0, "RewardContract: Insufficient Balance");
+            return tax;
+        }
+    }
+
     // dev get rewards
     function claimDevAwards() external {
         require(msg.sender == dev, "RewardContract: only dev can receive awards");
@@ -135,7 +173,10 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
         if (amount > MaxAvailAwards) {
             rewards = MaxAvailAwards.sub(devAccAwards);
         }
-        require(platformToken.issue(dev, rewards), "RewardContract: get awards failed");
+        if (rewards.add(platformToken.totalSupply()) > platformToken.maxSupply()) {
+            rewards = platformToken.maxSupply().sub(platformToken.totalSupply());
+        }
+        require(platformToken.issue(dev, rewards), "RewardContract: claim awards failed");
         devAccAwards = devAccAwards.add(rewards);
     }
 
@@ -232,7 +273,7 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
                     destroy = destroy.add(user.taxList[_head].amount.sub(available));
                     _head = _head.add(1).mod(taxEpoch);
                     if (_head == user.taxTail) {
-                        user.notEmpty = true;
+                        user.notEmpty = false;
                     }
                 }
             }
