@@ -139,7 +139,7 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
                 // non-levied tax rate
                 TaxInfo memory taxInfo = user.taxList[_head];
                 uint rate = current.sub(taxInfo.epoch).add(1).mul(1e12).div(_ep);
-                if(rate > 1e12){
+                if (rate > 1e12) {
                     rate = 1e12;
                 }
                 uint256 available = taxInfo.amount.mul(rate).div(1e12);
@@ -166,17 +166,13 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
     // dev get rewards
     function claimDevAwards() external {
         require(msg.sender == dev, "RewardContract: only dev can receive awards");
-        require(devAccAwards <= MaxAvailAwards, "RewardContract: dev awards exceed permitted amount");
-        //        require(devStartBlock != 0, "RewardContract: dev awards not release");
+        require(devAccAwards < MaxAvailAwards, "RewardContract: dev awards exceed permitted amount");
         uint256 amount = block.number.sub(devStartBlock).mul(devPerBlock);
         uint256 rewards = amount.sub(devAccAwards);
         if (amount > MaxAvailAwards) {
             rewards = MaxAvailAwards.sub(devAccAwards);
         }
-        if (rewards.add(platformToken.totalSupply()) > platformToken.maxSupply()) {
-            rewards = platformToken.maxSupply().sub(platformToken.totalSupply());
-        }
-        require(platformToken.issue(dev, rewards), "RewardContract: claim awards failed");
+        safeIssue(dev, rewards, "RewardContract: dev claim awards failed");
         devAccAwards = devAccAwards.add(rewards);
     }
 
@@ -241,7 +237,7 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
 
     function withdraw(uint256 _amount) external {
         uint256 current = getCurrEpoch();
-        uint256 destroy = 0;
+        uint256 _destroy = 0;
         // get base time
         UserInfo storage user = userInfo[msg.sender];
         // rebase
@@ -264,37 +260,41 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
                 if (available >= arrears) {
                     uint256 newAmount = arrears.mul(1e12).div(rate);
                     user.taxList[_head].amount = user.taxList[_head].amount.sub(newAmount);
-                    destroy = destroy.add(newAmount.sub(arrears));
+                    _destroy = _destroy.add(newAmount.sub(arrears));
                     arrears = 0;
                     break;
                 }
                 else {
                     arrears = arrears.sub(available);
-                    destroy = destroy.add(user.taxList[_head].amount.sub(available));
+                    _destroy = _destroy.add(user.taxList[_head].amount.sub(available));
                     _head = _head.add(1).mod(taxEpoch);
                     if (_head == user.taxTail) {
                         user.notEmpty = false;
                     }
                 }
             }
+
             user.taxHead = _head;
             require(arrears == 0, "RewardContract: Insufficient Balance");
-            if (destroy > 0) {
-                require(platformToken.issue(treasury, destroy), "RewardContract: levy tax failed");
-            }
+            destroy(_destroy);
         }
-        require(platformToken.issue(msg.sender, _amount), "RewardContract: get awards failed");
-        emit Withdraw(msg.sender, _amount, destroy);
+        safeIssue(msg.sender, _amount, "RewardContract: claim awards failed");
+        emit Withdraw(msg.sender, _amount, _destroy);
     }
 
-    function destroy(uint256 amount) onlyGovernor external {
-        if (amount > 0) {
-            require(platformToken.issue(treasury, amount), "RewardContract: levy tax failed");
-        }
+    function destroy(uint256 amount) onlyGovernor public {
+        safeIssue(treasury, amount, "RewardContract: levy tax failed");
     }
 
     function getCurrEpoch() internal view returns (uint256) {
         return now.div(epUnit);
+    }
+
+    function safeIssue(address user, uint256 amount, string memory err) internal {
+        if (amount > 0) {
+            require(amount.add(platformToken.totalSupply()) <= platformToken.maxSupply(), "RewardContract: awards exceeds maxSupply");
+            require(platformToken.issue(user, amount), err);
+        }
     }
 
     function rebase(UserInfo storage _user, uint256 _current) internal {
