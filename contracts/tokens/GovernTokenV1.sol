@@ -7,34 +7,34 @@ import "../interfaces/ITokenVotorV1.sol";
 
 contract GovernTokenV1 is ERC20Token, ITokenVotorV1 {
 
-    /// @notice A record of each accounts delegates
+    // A record of each accounts delegates
     mapping(address => address) internal _delegates;
 
-    /// @notice A checkpoint for marking number of votes from a given block
+    // A checkpoint for marking number of votes from a given block
     struct Checkpoint {
         uint32 fromBlock;
         uint256 votes;
     }
 
-    /// @notice A record of votes checkpoints for each account, by index
+    // A record of votes checkpoints for each account, by index
     mapping(address => mapping(uint32 => Checkpoint)) public checkpoints;
 
-    /// @notice The number of checkpoints for each account
+    // The number of checkpoints for each account
     mapping(address => uint32) public numCheckpoints;
 
-    /// @notice The EIP-712 typehash for the contract's domain
+    // The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
 
-    /// @notice The EIP-712 typehash for the delegation struct used by the contract
+    // The EIP-712 typehash for the delegation struct used by the contract
     bytes32 public constant DELEGATION_TYPEHASH = keccak256("Delegation(address delegatee,uint256 nonce,uint256 expiry)");
 
-    /// @notice A record of states for signing / validating signatures
+    // A record of states for signing / validating signatures
     mapping(address => uint) public nonces;
 
-    /// @notice An event thats emitted when an account changes its delegate
+    // An event thats emitted when an account changes its delegate
     event DelegateChanged(address indexed delegator, address indexed fromDelegate, address indexed toDelegate);
 
-    /// @notice An event thats emitted when a delegate account's vote balance changes
+    // An event thats emitted when a delegate account's vote balance changes
     event DelegateVotesChanged(address indexed delegate, uint previousBalance, uint newBalance);
 
     constructor(string memory name, string memory sym, uint256 maxSupply) ERC20Token(name, sym, maxSupply) public {}
@@ -107,9 +107,9 @@ contract GovernTokenV1 is ERC20Token, ITokenVotorV1 {
         );
 
         address signatory = ecrecover(digest, v, r, s);
-        require(signatory != address(0), "DFMGovernTokenV2::delegateBySig: invalid signature");
-        require(nonce == nonces[signatory]++, "DFMGovernTokenV2::delegateBySig: invalid nonce");
-        require(now <= expiry, "DFMGovernTokenV2::delegateBySig: signature expired");
+        require(signatory != address(0), "GovernTokenV1::delegateBySig: invalid signature");
+        require(nonce == nonces[signatory]++, "GovernTokenV1::delegateBySig: invalid nonce");
+        require(now <= expiry, "GovernTokenV1::delegateBySig: signature expired");
         return _delegate(signatory, delegatee);
     }
 
@@ -141,7 +141,7 @@ contract GovernTokenV1 is ERC20Token, ITokenVotorV1 {
     view
     returns (uint256)
     {
-        require(blockNumber < block.number, "DFMGovernTokenV2::getPriorVotes: not yet determined");
+        require(blockNumber < block.number, "GovernTokenV1::getPriorVotes: not yet determined");
 
         uint32 nCheckpoints = numCheckpoints[account];
         if (nCheckpoints == 0) {
@@ -216,7 +216,7 @@ contract GovernTokenV1 is ERC20Token, ITokenVotorV1 {
     )
     internal
     {
-        uint32 blockNumber = safe32(block.number, "DFMGovernTokenV2::_writeCheckpoint: block number exceeds 32 bits");
+        uint32 blockNumber = safe32(block.number, "GovernTokenV1::_writeCheckpoint: block number exceeds 32 bits");
 
         if (nCheckpoints > 0 && checkpoints[delegatee][nCheckpoints - 1].fromBlock == blockNumber) {
             checkpoints[delegatee][nCheckpoints - 1].votes = newVotes;
