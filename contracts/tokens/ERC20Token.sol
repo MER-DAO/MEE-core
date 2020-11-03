@@ -29,9 +29,9 @@ contract ERC20Token is IERC20Token, Ownable {
         _name = name;
         _symbol = sym;
         _decimals = 18;
-        if(maxSupply == 0){
-            _maxSupply = uint256(-1);
-        }else{
+        if (maxSupply == 0) {
+            _maxSupply = uint256(- 1);
+        } else {
             _maxSupply = maxSupply;
         }
 
@@ -82,20 +82,17 @@ contract ERC20Token is IERC20Token, Ownable {
     }
 
     function transferFrom(address sender, address recipient, uint256 amount) external override returns (bool) {
-        //        require(!frozen[sender] && !frozen[recipient] && !frozen[msg.sender], "address frozen");
         _transfer(sender, recipient, amount);
         _approve(sender, msg.sender, _allowances[sender][msg.sender].sub(amount));
         return true;
     }
 
     function increaseAllowance(address spender, uint256 addedValue) external returns (bool) {
-        //        require(!frozen[spender] && !frozen[msg.sender], "address frozen");
         _approve(msg.sender, spender, _allowances[msg.sender][spender].add(addedValue));
         return true;
     }
 
     function decreaseAllowance(address spender, uint256 subtractedValue) external returns (bool) {
-        //        require(!frozen[spender] && !frozen[msg.sender], "address frozen");
         _approve(msg.sender, spender, _allowances[msg.sender][spender].sub(subtractedValue));
         return true;
     }
