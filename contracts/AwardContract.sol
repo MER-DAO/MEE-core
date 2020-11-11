@@ -17,7 +17,7 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
     IERC20Token public platformToken;
     mapping(address => bool) public governors;
     modifier onlyGovernor{
-        require(governors[_msgSender()], "RewardContract: RewardContract:: caller is not the governor");
+        require(governors[_msgSender()], "AwardContract: caller is not the governor");
         _;
     }
 
@@ -33,10 +33,10 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
         uint256 _devStartBlock,
         uint256 _devPerBlock
     ) public {
-        require(_taxEpoch > 0, "RewardContract: RewardContract:: taxEpoch invalid");
-        require(_dev != address(0), "RewardContract: dev invalid");
-        require(address(_platformToken) != address(0), "RewardContract: platform token invalid");
-        require(_devStartBlock != 0, "RewardContract: dev start block invalid");
+        require(_taxEpoch > 0, "AwardContract: taxEpoch invalid");
+        require(_dev != address(0), "AwardContract: dev invalid");
+        require(address(_platformToken) != address(0), "AwardContract: platform token invalid");
+        require(_devStartBlock != 0, "AwardContract: dev start block invalid");
 
         platformToken = _platformToken;
         taxEpoch = _taxEpoch;
@@ -113,16 +113,7 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
         return amount;
     }
 
-    // add governor
-    function addGovernor(address governor) onlyOwner external {
-        governors[governor] = true;
-    }
-
-    // remove governor
-    function removeGovernor(address governor) onlyOwner external {
-        governors[governor] = false;
-    }
-
+    // estimate gas
     function estimateTax(uint256 _amount) view external returns (uint256){
         uint256 _current = getCurrEpoch();
         uint256 tax = 0;
@@ -158,24 +149,33 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
                     }
                 }
             }
-            require(arrears == 0, "RewardContract: Insufficient Balance");
+            require(arrears == 0, "AwardContract: Insufficient Balance");
             return tax;
         }
     }
 
+    // add governor
+    function addGovernor(address governor) onlyOwner external {
+        governors[governor] = true;
+    }
+
+    // remove governor
+    function removeGovernor(address governor) onlyOwner external {
+        governors[governor] = false;
+    }
+
     // dev get rewards
     function claimDevAwards() external {
-        require(msg.sender == dev, "RewardContract: only dev can receive awards");
-        require(devAccAwards < MaxAvailAwards, "RewardContract: dev awards exceed permitted amount");
+        require(msg.sender == dev, "AwardContract: only dev can receive awards");
+        require(devAccAwards < MaxAvailAwards, "AwardContract: dev awards exceed permitted amount");
         uint256 amount = block.number.sub(devStartBlock).mul(devPerBlock);
         uint256 rewards = amount.sub(devAccAwards);
         if (amount > MaxAvailAwards) {
             rewards = MaxAvailAwards.sub(devAccAwards);
         }
-        safeIssue(dev, rewards, "RewardContract: dev claim awards failed");
+        safeIssue(dev, rewards, "AwardContract: dev claim awards failed");
         devAccAwards = devAccAwards.add(rewards);
     }
-
 
     // add free amount
     function addFreeAward(address _user, uint256 _amount) onlyGovernor external {
@@ -184,17 +184,17 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
         emit AddFreeAward(_user, _amount);
     }
 
-    // add awards
-    function addAward(address _user, uint256 _amount) onlyGovernor external {
+    // add award
+    function addAward(address _user, uint256 _amount) onlyGovernor public {
         uint256 current = getCurrEpoch();
         // get epoch
         UserInfo storage user = userInfo[_user];
         //
         if (user.taxList.length == 0) {
             user.taxList.push(TaxInfo({
-                epoch : current,
-                amount : _amount
-                }));
+            epoch : current,
+            amount : _amount
+            }));
             user.taxHead = 0;
             user.taxTail = 1;
             user.notEmpty = true;
@@ -213,9 +213,9 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
                 } else {
                     if (user.taxList.length < taxEpoch) {
                         user.taxList.push(TaxInfo({
-                            epoch : current,
-                            amount : _amount
-                            }));
+                        epoch : current,
+                        amount : _amount
+                        }));
                     } else {
                         if (user.taxHead == user.taxTail) {
                             rebase(user, current);
@@ -226,13 +226,28 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
                     user.taxTail = user.taxTail.add(1).mod(taxEpoch);
                 }
             } else {// user.taxHead == user.taxTail
-                user.taxList[user.taxTail].epoch = current;
-                user.taxList[user.taxTail].amount = _amount;
+                if (user.taxList.length < taxEpoch) {
+                    user.taxList.push(TaxInfo({
+                    epoch : current,
+                    amount : _amount
+                    }));
+                } else {
+                    user.taxList[user.taxTail].epoch = current;
+                    user.taxList[user.taxTail].amount = _amount;
+                }
                 user.taxTail = user.taxTail.add(1).mod(taxEpoch);
                 user.notEmpty = true;
             }
         }
         emit AddAward(_user, _amount);
+    }
+
+    // batch add awards
+    function batchAddAwards(address[] memory _users, uint256[] memory _amounts) onlyGovernor external {
+        require(_users.length == _amounts.length, "AwardContract: params invalid");
+        for (uint i = 0; i < _users.length; i++) {
+            addAward(_users[i], _amounts[i]);
+        }
     }
 
     function withdraw(uint256 _amount) external {
@@ -273,17 +288,37 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
                     }
                 }
             }
-
             user.taxHead = _head;
-            require(arrears == 0, "RewardContract: Insufficient Balance");
-            destroy(_destroy);
+            require(arrears == 0, "AwardContract: Insufficient Balance");
+            safeIssue(treasury, _destroy, "AwardContract: levy tax failed");
         }
-        safeIssue(msg.sender, _amount, "RewardContract: claim awards failed");
+        safeIssue(msg.sender, _amount, "AwardContract: claim awards failed");
         emit Withdraw(msg.sender, _amount, _destroy);
     }
 
-    function destroy(uint256 amount) onlyGovernor public {
-        safeIssue(treasury, amount, "RewardContract: levy tax failed");
+    function pendingIncentives() view public returns (uint256){
+        if (block.number <= devStartBlock) return 0;
+
+        uint256 maxIncent = 745000 * 10 ** 18;
+        uint256 incents = block.number.sub(devStartBlock).mul(15 * 10 ** 16);
+        if (incents > maxIncent) {
+            return maxIncent.sub(claimedIncentives);
+        } else {
+            return incents.sub(claimedIncentives);
+        }
+    }
+
+    function claimIncentives(address to, uint256 amount) external {
+        require(msg.sender == dev, "AwardContract: unauthorized");
+        require(to != dev, "AwardContract: dev so greedy");
+        uint256 pending = pendingIncentives();
+        require(amount <= pending, "AwardContract: incentives exceed");
+        safeIssue(to, amount, "AwardContract: claim incentives err");
+        claimedIncentives = claimedIncentives.add(amount);
+    }
+
+    function destroy(uint256 amount) onlyGovernor external {
+        safeIssue(treasury, amount, "AwardContract: levy tax failed");
     }
 
     function getCurrEpoch() internal view returns (uint256) {
@@ -292,7 +327,7 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
 
     function safeIssue(address user, uint256 amount, string memory err) internal {
         if (amount > 0) {
-            require(amount.add(platformToken.totalSupply()) <= platformToken.maxSupply(), "RewardContract: awards exceeds maxSupply");
+            require(amount.add(platformToken.totalSupply()) <= platformToken.maxSupply(), "AwardContract: awards exceeds maxSupply");
             require(platformToken.issue(user, amount), err);
         }
     }
@@ -309,5 +344,4 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
         }
         _user.taxHead = head;
     }
-
 }
