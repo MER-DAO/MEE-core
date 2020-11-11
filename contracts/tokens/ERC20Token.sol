@@ -18,7 +18,7 @@ contract ERC20Token is IERC20Token, Ownable {
     uint8 internal _decimals;
     uint256 internal _maxSupply;
 
-    mapping(address => bool) internal issuer;
+    mapping(address => bool) public issuer;
 
     modifier onlyIssuer() {
         require(issuer[msg.sender], "The caller does not have issuer role privileges");
