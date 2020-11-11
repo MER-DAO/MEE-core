@@ -297,7 +297,7 @@ contract AwardContract is DevAward, AwardInfo, Ownable {
     }
 
     function pendingIncentives() view public returns (uint256){
-        uint256 startBlock = devStartBlock.sub(411075); //adjust incentive startBlock(equal to LPStaking startBlock), devStartBlock delays 9 weeks(411075)
+        uint256 startBlock = 11210456;   // It's staking start block
         if (block.number <= startBlock) return 0;
 
         uint256 maxIncent = 745000 * 10 ** 18;
