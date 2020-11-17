@@ -126,7 +126,7 @@ contract ERC20Token is IERC20Token, Ownable {
         return false;
     }
 
-    function _transfer(address sender, address recipient, uint256 amount) internal {
+    function _transfer(address sender, address recipient, uint256 amount) virtual internal {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
 

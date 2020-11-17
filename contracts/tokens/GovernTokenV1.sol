@@ -175,6 +175,12 @@ contract GovernTokenV1 is ERC20Token, ITokenVotorV1 {
         return checkpoints[account][lower].votes;
     }
 
+    // transfers delegate authority when sending a token.
+    function _transfer(address sender, address recipient, uint256 amount) internal override virtual {
+        super._transfer(sender, recipient, amount);
+        _moveDelegates(_delegates[sender], _delegates[recipient], amount);
+    }
+
     function _delegate(address delegator, address delegatee)
     internal
     {
